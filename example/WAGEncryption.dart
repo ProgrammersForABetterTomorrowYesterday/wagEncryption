@@ -7,8 +7,7 @@ import 'package:WAGEncryption/WAGEncryption.dart';
 
 main() {
 
-
-  wagAESEncryption cipher = new wagAESEncryption.fromUint8List()
+  wagAESEncryption cipher = new wagAESEncryption.fromUint8List();
 
   /*AsymmetricKeyPair pair = wagKeyGen.generateKeys();
   RSAPublicKey pub = pair.publicKey;

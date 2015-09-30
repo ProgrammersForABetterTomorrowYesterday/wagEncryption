@@ -12,24 +12,28 @@ import "package:cipher/impl/server.dart";
 import "package:cipher/random/secure_random_base.dart" show SecureRandomBase;
 
 export "dart:typed_data" show Uint8List;
-export "package:cipher/cipher.dart" show AsymmetricKeyPair, RSAPublicKey, RSAPrivateKey;
+export "package:cipher/cipher.dart" show AsymmetricKeyPair, RSAPublicKey, RSAPrivateKey, RSASignature;
 
-/// Checks if you are awesome. Spoiler: you are.
-class wagAESEncryption {
+abstract class wagEncryption {
+  String encrypt(String plaintext);
+  String decrypt(String ciphertext);
+}
+
+class wagAESEncryption implements wagEncryption {
   Uint8List _key;
   KeyParameter _kparams;
   Uint8List iv;
   ParametersWithIV params;
 
   wagAESEncryption(String symkey, {String symiv: ""}) {
-    _key = new Uint8List.fromList(symkey.codeUnits);
+    _key = wagConvert.string_u8l(symkey);
     _kparams = new KeyParameter( _key );
     if (symiv == "")
     {
       wagSecureRandom rand = new wagSecureRandom();
       iv = rand.nextBytes(16);
     } else {
-      iv = new Uint8List.fromList(symiv.codeUnits);
+      iv = wagConvert.string_u8l(symiv);
     }
     params = new ParametersWithIV(_kparams, iv);
   }
@@ -49,7 +53,7 @@ class wagAESEncryption {
     var cipher = new BlockCipher( "AES/CBC" )
       ..init( true, params );
 
-    var u8plainText = new Uint8List.fromList(plaintext.codeUnits);
+    var u8plainText = wagConvert.string_u8l(plaintext);
     int fillrem = (u8plainText.lengthInBytes % 16);
     fillrem = 16 - fillrem;
     List tmplist = new List.from(u8plainText);
@@ -69,7 +73,7 @@ class wagAESEncryption {
       i++;
     }
 
-    return(new String.fromCharCodes(tmp));
+    return(wagConvert.u8L_string(tmp));
   }
 
   String decrypt(String ciphertext) {
@@ -77,7 +81,7 @@ class wagAESEncryption {
     var cipher = new BlockCipher( "AES/CBC" )
       ..init( false, params );
 
-    var u8cipherText = new Uint8List.fromList(ciphertext.codeUnits);
+    var u8cipherText = wagConvert.string_u8l(ciphertext);
 
     var tmp = new Uint8List.fromList(u8cipherText);
     var maxlen = tmp.lengthInBytes;
@@ -90,11 +94,11 @@ class wagAESEncryption {
       i++;
     }
 
-    return(new String.fromCharCodes(tmp));
+    return(wagConvert.u8L_string(tmp));
   }
 }
 
-class wagRSAEncryption {
+class wagRSAEncryption implements wagEncryption {
   RSAPrivateKey priv = null;
   RSAPublicKey pub = null;
 
@@ -119,9 +123,9 @@ class wagRSAEncryption {
       ..init( true, pubpar )
     ;
 
-    var cipherText = cipher.process(new Uint8List.fromList(plaintext.codeUnits));
+    var cipherText = cipher.process(wagConvert.string_u8l(plaintext));
 
-    return(new String.fromCharCodes(cipherText));
+    return(wagConvert.u8L_string(cipherText));
   }
 
   String decrypt(String ciphertext) {
@@ -136,19 +140,26 @@ class wagRSAEncryption {
       ..init(false, privpar)
     ;
 
-    var plainText = cipher.process(new Uint8List.fromList(ciphertext.codeUnits));
+    var plainText = cipher.process(wagConvert.string_u8l(ciphertext));
 
-    return(new String.fromCharCodes(plainText));
+    return(wagConvert.u8L_string(plainText));
   }
 
-  String sign(String message) {
+  RSASignature sign(String message) {
     if (!canSign) {
       throw StateError;
     }
 
     initCipher();
 
-    //TODO: Implement signing.
+    var privParams = new PrivateKeyParameter(priv);
+    var signParams = new ParametersWithRandom(privParams, new wagSecureRandom());
+
+    Signer signer = new Signer("SHA-1/RSA")
+      ..init( true, signParams )
+    ;
+
+    return signer.generateSignature(wagConvert.string_u8l(message));
   }
 
   bool verify(String message, RSASignature signature) {
@@ -158,7 +169,21 @@ class wagRSAEncryption {
 
     initCipher();
 
-    //TODO: Implement signature verification.
+    var verifyParams = new PublicKeyParameter(pub);
+    var randParams = new ParametersWithRandom(verifyParams, new wagSecureRandom());
+
+    Signer signer = new Signer("SHA-1/RSA")
+      ..init( false, randParams )
+    ;
+
+    bool verified;
+    try {
+      verified = signer.verifySignature(wagConvert.string_u8l(message), signature);
+    } catch(e) {
+      verified = false;
+    }
+
+    return verified;
   }
 }
 
@@ -196,7 +221,7 @@ class wagKeyGen {
     String newpass = "";
     wagSecureRandom rand = new wagSecureRandom();
 
-    newpass = new String.fromCharCodes(rand.nextBytes(bytes).toList());
+    newpass = wagConvert.u8L_string(rand.nextBytes(bytes));
     print("Password: $newpass");
     return deriveKey(newpass);
   }
@@ -207,7 +232,7 @@ class wagKeyGen {
 
     //If the provided salt is a string, make it a Uint8List
     if(setSalt is String) {
-      setSalt = new Uint8List.fromList(setSalt.codeUnits);
+      setSalt = wagConvert.string_u8l(setSalt);
     }
     //If the provided salt is now a Uint8List, move it into the salt.
     if(setSalt is Uint8List) {
@@ -217,19 +242,19 @@ class wagKeyGen {
     if(salt == null)
     {
       wagSecureRandom rand = new wagSecureRandom();
-      salt = rand.nextBytes(4);
+      salt = rand.nextBytes(16);
     }
 
     Pbkdf2Parameters params = new Pbkdf2Parameters(salt, 100, 16);
     KeyDerivator keyDerivator = new KeyDerivator("SHA-1/HMAC/PBKDF2")
       ..init(params);
 
-    Uint8List passwordBytes = new Uint8List.fromList(password.codeUnits);
+    Uint8List passwordBytes = wagConvert.string_u8l(password);
 
     Uint8List key = keyDerivator.process( passwordBytes );
 
-    return(new wagDerivedKey()..dsalt = salt
-                              ..dkey = key);
+    return(new wagDerivedKey()..dk_iv = salt
+                              ..dk_key = key);
   }
 
   static AsymmetricKeyPair generateKeys() {
@@ -247,28 +272,28 @@ class wagKeyGen {
 }
 
 class wagDerivedKey {
-  Uint8List dkey;
-  Uint8List dsalt;
+  Uint8List dk_key;
+  Uint8List dk_iv;
 
-  encrypt(wagRSAEncryption cipher) {
-    String s_dkey = new String.fromCharCodes(dkey.toList());
-    String s_dsalt = new String.fromCharCodes(dsalt.toList());
-
-    s_dkey = cipher.encrypt(s_dsalt);
-    s_dsalt = cipher.encrypt(s_dkey);
-
-    dkey = new Uint8List.fromList(s_dkey.codeUnits);
-    dsalt = new Uint8List.fromList(s_dsalt.codeUnits);
+  void encrypt(wagEncryption cipher) {
+    String s_dkey = wagConvert.u8L_string(dk_key);
+    s_dkey = cipher.encrypt(s_dkey);
+    dk_key = wagConvert.string_u8l(s_dkey);
   }
 
-  decrypt(wagRSAEncryption cipher) {
-    String s_dkey = new String.fromCharCodes(dkey.toList());
-    String s_dsalt = new String.fromCharCodes(dsalt.toList());
+  void decrypt(wagEncryption cipher) {
+    String s_dkey = wagConvert.u8L_string(dk_key);
+    s_dkey = cipher.decrypt(s_dkey);
+    dk_key = wagConvert.string_u8l(s_dkey);
+  }
+}
 
-    s_dkey = cipher.decrypt(s_dsalt);
-    s_dsalt = cipher.decrypt(s_dkey);
+class wagConvert {
+  static String u8L_string(Uint8List bytelist) {
+    return new String.fromCharCodes(bytelist.toList());
+  }
 
-    dkey = new Uint8List.fromList(s_dkey.codeUnits);
-    dsalt = new Uint8List.fromList(s_dsalt.codeUnits);
+  static Uint8List string_u8l(String message) {
+    return new Uint8List.fromList(message.codeUnits);
   }
 }

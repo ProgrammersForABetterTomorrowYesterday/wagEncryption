@@ -7,38 +7,60 @@ import 'package:WAGEncryption/WAGEncryption.dart';
 
 main() {
 
-  wagAESEncryption cipher = new wagAESEncryption.fromUint8List();
+  AsymmetricKeyPair pair = wagKeyGen.generateKeys();
+  RSAPublicKey pub = pair.publicKey;
+  RSAPrivateKey priv = pair.privateKey;
+  wagRSAEncryption cipher = new wagRSAEncryption(pub, priv);
+
+  String pt = "This is a test.";
+  RSASignature sig = cipher.sign(pt);
+  print("PT: $pt");
+  print("Verified: ${cipher.verify(pt, sig)}");
+  print("Not Verified: ${cipher.verify("This is different text.", sig)}");
+
+  pair = wagKeyGen.generateKeys();
+  wagRSAEncryption cipher2 = new wagRSAEncryption(pair.publicKey, pair.privateKey);
+  print("Not Verified: ${cipher2.verify(pt, sig)}");
+  print("Not Verified: ${cipher2.verify("This is different text.", sig)}");
+
+  /*wagDerivedKey key = wagKeyGen.randomDerivedKey();
+  wagAESEncryption cipher = new wagAESEncryption.fromUint8List(key.dkey, key.dsalt);
+  print(key.dsalt.toList());
+  String pt = "Test";
+  String ct = cipher.encrypt(pt);
+  print(pt);
+  print(ct);
+  print(cipher.decrypt(ct))*/;
 
   /*AsymmetricKeyPair pair = wagKeyGen.generateKeys();
   RSAPublicKey pub = pair.publicKey;
   RSAPrivateKey priv = pair.privateKey;
 
   wagDerivedKey AESKey = wagKeyGen.randomDerivedKey();
-  print("Key: ${AESKey.dkey}");
-  print("Salt: ${AESKey.dsalt}");
+  print("Key: ${AESKey.dk_key}");
+  print("Salt: ${AESKey.dk_iv}");
 
   wagRSAEncryption RSAcipher = new wagRSAEncryption(pub, priv);
-  wagAESEncryption AEScipher = new wagAESEncryption.fromUint8List(AESKey.dkey, AESKey.dsalt);
+  wagAESEncryption AEScipher = new wagAESEncryption.fromUint8List(AESKey.dk_key, AESKey.dk_iv);
 
   AESKey.encrypt(RSAcipher);
   print("Encrypted.");
-  print("Key: ${AESKey.dkey}");
-  print("Salt: ${AESKey.dsalt}");
+  print("Key: ${AESKey.dk_key}");
+  print("Salt: ${AESKey.dk_iv}");
 
   String pt = "This is plaintext!";
   print("PT: $pt");
-  //VVVV FAILS VVVV
-  //String ct = AEScipher.encrypt(pt);
-  //^^^^ FAILS ^^^^
-  //print("CT: $ct");
+  String ct = AEScipher.encrypt(pt);
+  print("CT: $ct");
 
   AESKey.decrypt(RSAcipher);
-  //wagAESEncryption AESdecipher = new wagAESEncryption.fromUint8List(AESKey.dkey, AESKey.dsalt);
+  wagAESEncryption AESdecipher = new wagAESEncryption.fromUint8List(AESKey.dk_key, AESKey.dk_iv);
   pt = "";
-  //pt = AESdecipher.decrypt(ct);
+  pt = AESdecipher.decrypt(ct);
   print("Decrypted.");
-  print("Key: ${AESKey.dkey}");
-  print("Salt: ${AESKey.dsalt}");*/
+  print("Key: ${AESKey.dk_key}");
+  print("Salt: ${AESKey.dk_iv}");
+  print("PT: ${AESdecipher.decrypt(ct)}");*/
 
   /*wagDerivedKey key = wagKeyGen.deriveKey("Password");
   print("Salt: ${key.dsalt}");

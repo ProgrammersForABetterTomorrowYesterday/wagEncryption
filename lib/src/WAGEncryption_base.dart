@@ -6,10 +6,12 @@
 library WAGEncryption.base;
 import "dart:typed_data" show Uint8List;
 import "dart:io" show File, RandomAccessFile;
+import 'dart:convert';
 import 'package:bignum/bignum.dart';
 import "package:cipher/cipher.dart";
 import "package:cipher/impl/server.dart";
 import "package:cipher/random/secure_random_base.dart" show SecureRandomBase;
+import "package:rsa_pkcs/rsa_pkcs.dart" as Parser show RSAPKCSParser, RSAKeyPair, RSAPublicKey, RSAPrivateKey;
 
 export "dart:typed_data" show Uint8List;
 export "package:cipher/cipher.dart" show AsymmetricKeyPair, RSAPublicKey, RSAPrivateKey, RSASignature;
@@ -69,8 +71,12 @@ class wagAESEncryption implements wagEncryption {
 
     int i = 0;
     while (i < rounds) {
-      var len = cipher.processBlock( u8plainText, (16*i), tmp, (16*i) );
+      cipher.processBlock( u8plainText, (16*i), tmp, (16*i) );
       i++;
+    }
+
+    if(remainder != 0) {
+      cipher.processBlock(u8plainText, ((16*i) + remainder), tmp, ((16*i) + remainder));
     }
 
     return(wagConvert.u8L_string(tmp));
@@ -90,8 +96,12 @@ class wagAESEncryption implements wagEncryption {
 
     int i = 0;
     while (i < rounds) {
-      var len = cipher.processBlock( u8cipherText, (16*i), tmp, (16*i) );
+      cipher.processBlock( u8cipherText, (16*i), tmp, (16*i) );
       i++;
+    }
+
+    if(remainder != 0) {
+      cipher.processBlock(u8cipherText, ((16*i) + remainder), tmp, ((16*i) + remainder));
     }
 
     return(wagConvert.u8L_string(tmp));
@@ -103,6 +113,41 @@ class wagRSAEncryption implements wagEncryption {
   RSAPublicKey pub = null;
 
   wagRSAEncryption(RSAPublicKey this.pub, [RSAPrivateKey this.priv = null]);
+  wagRSAEncryption.deserialize(String json) {
+    Map<String, List<int>> cereal = JSON.decode(json);
+    RSAPublicKey public = null;
+    RSAPrivateKey private = null;
+
+    BigInteger modulus = new BigInteger(cereal['modulus'], 16);
+    BigInteger publicExponent = new BigInteger(cereal['publicexponent'], 16);
+
+    if(cereal['p'] != null) {
+      BigInteger p = new BigInteger(cereal['p'], 16);
+      BigInteger q = new BigInteger(cereal['q'], 16);
+      BigInteger privateExponent = new BigInteger(cereal['privateexponent'], 16);
+      private = new RSAPrivateKey(modulus, privateExponent, p, q);
+    }
+    public = new RSAPublicKey(modulus, publicExponent);
+
+    this.pub = public;
+    this.priv = private;
+  }
+
+  String serializeKeys() {
+    Map<String, String> cereal = new Map<String, String>();
+    if(priv == null) {
+      cereal['p'] = null;
+      cereal['q'] = null;
+      cereal['privateexponent'] = null;
+    } else {
+      cereal['p'] = priv.p.toString(16);
+      cereal['q'] = priv.q.toString(16);
+      cereal['privateexponent'] = priv.exponent.toString(16);
+    }
+    cereal['modulus'] = pub.modulus.toString(16);
+    cereal['publicexponent'] = pub.exponent.toString(16);
+    return JSON.encode(cereal);
+  }
 
   bool get hasPriv => ((priv != null) ? true : false);
   bool get hasPub => ((pub != null) ? true : false);
@@ -295,5 +340,14 @@ class wagConvert {
 
   static Uint8List string_u8l(String message) {
     return new Uint8List.fromList(message.codeUnits);
+  }
+
+  static AsymmetricKeyPair parsePemString(String pem) {
+    Parser.RSAPKCSParser parser = new Parser.RSAPKCSParser();
+    Parser.RSAKeyPair pair = parser.parsePEM(pem);
+    Parser.RSAPublicKey pub = pair.public;
+    Parser.RSAPrivateKey priv = pair.private;
+
+    //TODO: Implement conversion between strings representing PEM files and Cipher.AsymmetricKeyPair
   }
 }

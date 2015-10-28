@@ -281,7 +281,7 @@ class wagRSAEncryption implements wagEncryption {
     var privParams = new PrivateKeyParameter(priv);
     var signParams = new ParametersWithRandom(privParams, new wagSecureRandom());
 
-    Signer signer = new Signer("SHA-512/RSA")
+    Signer signer = new Signer("SHA-1/RSA")
       ..init( true, signParams )
     ;
 
@@ -298,7 +298,7 @@ class wagRSAEncryption implements wagEncryption {
     var verifyParams = new PublicKeyParameter(pub);
     var randParams = new ParametersWithRandom(verifyParams, new wagSecureRandom());
 
-    Signer signer = new Signer("SHA-512/RSA")
+    Signer signer = new Signer("SHA-1/RSA")
       ..init( false, randParams )
     ;
 

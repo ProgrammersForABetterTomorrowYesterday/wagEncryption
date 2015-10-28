@@ -21,6 +21,70 @@ abstract class wagEncryption {
   String decrypt(String ciphertext);
 }
 
+class wagMessageEncryption implements wagEncryption {
+  wagAESEncryption rand_aes;
+  wagRSAEncryption host_rsa;
+  wagRSAEncryption recip_rsa;
+  bool used = false;
+
+  wagMessageEncryption(wagRSAEncryption this.host_rsa, wagRSAEncryption this.recip_rsa);
+
+  String encrypt(String plaintext) {
+    if(!host_rsa.canSign || !recip_rsa.canEncrypt)
+      throw new UnsupportedError("Current encrypted object is unable to sign and encrypt messages.");
+    if (!used) {
+      used = true;
+
+      //Get host sig on pt
+      RSASignature tmpsig = host_rsa.sign(plaintext);
+      //Convert RSASignature to String
+      Uint8List sigbytes = tmpsig.bytes;
+      String sig = wagConvert.u8L_string(sigbytes);
+      //Concatenate sig and pt
+      StringBuffer signedbuff = new StringBuffer();
+      signedbuff.writeAll([sig, plaintext], "|_|");
+
+      //Generate a new random AESKey
+      wagDerivedKey randAESKey = wagKeyGen.randomDerivedKey();
+      rand_aes = new wagAESEncryption.fromUint8List(randAESKey.dk_key, randAESKey.dk_iv);
+      //Encrypt the signed plaintext with the new AESKey
+      String ciphertext = rand_aes.encrypt(signedbuff.toString());
+      //Convert the AESKey object into a String, and encrypt it with recip_rsa
+      String pt_aesKey = rand_aes.serializeKey();
+      String ct_aesKey = recip_rsa.encrypt(pt_aesKey);
+      //Concatenate the encrypted AESKey and the encrypted (signed) message
+      StringBuffer tmpbuf = new StringBuffer();
+      tmpbuf.writeAll([ct_aesKey, ciphertext], "|_|");
+      return tmpbuf.toString();
+    }
+    throw new StateError("Encryption object expired, may not encrypt multiple times with the same object.");
+  }
+
+  String decrypt(String ciphertext) {
+    if(!host_rsa.canVerify || !recip_rsa.canDecrypt)
+      throw new UnsupportedError("Current encrypted object is unable to decrypt and verify messages.");
+    if (!used) {
+      used = true;
+      var split_ct = ciphertext.split("|_|");
+      String aesKey = recip_rsa.decrypt(split_ct[0]);
+      String message_ct = split_ct[1];
+      rand_aes = new wagAESEncryption.deserialize(aesKey);
+      String signedmessage_pt = rand_aes.decrypt(message_ct);
+      var splitmessage_pt = signedmessage_pt.split("|_|");
+      String message_sig = splitmessage_pt[0];
+      String message_pt = splitmessage_pt[1];
+      RSASignature sig = new RSASignature(wagConvert.string_u8l(message_sig));
+      bool verified = host_rsa.verify(message_pt, sig);
+      if (verified) {
+        return message_pt;
+      }
+      throw new ArgumentError("Unverified: $message_pt");
+
+    }
+    throw new StateError("Encryption object expired, may not decrypt multiple times with the same object.");
+  }
+}
+
 class wagAESEncryption implements wagEncryption {
   Uint8List _key;
   KeyParameter _kparams;
@@ -50,22 +114,21 @@ class wagAESEncryption implements wagEncryption {
     params = new ParametersWithIV(_kparams, iv);
   }
 
-  wagAESEncryption.deserialize(String json) {
-    Map<String, String> cereal = JSON.decode(json);
-    String key = cereal['key'];
-    String iv = cereal['iv'];
+  wagAESEncryption.deserialize(String kI) {
+    var key = kI.split("|_|");
+    String k = key[0];
+    String iv = key[1];
 
-    this._key = wagConvert.string_u8l(key);
+    this._key = wagConvert.string_u8l(k);
     this._kparams = new KeyParameter(_key);
     this.iv = wagConvert.string_u8l(iv);
-    this.params = new ParametersWithIV(_kparams, iv);
+    this.params = new ParametersWithIV(this._kparams, this.iv);
   }
 
   String serializeKey() {
-    Map<String, String> cereal = new Map<String, String>();
-    cereal['key'] = wagConvert.u8L_string(_key);
-    cereal['iv'] = wagConvert.u8L_string(iv);
-    return JSON.encode(cereal);
+    String k = wagConvert.u8L_string(_key);
+    String i = wagConvert.u8L_string(iv);
+    return "$k|_|$i";
   }
 
   String encrypt(String plaintext) {
@@ -207,7 +270,7 @@ class wagRSAEncryption implements wagEncryption {
 
     return(wagConvert.u8L_string(plainText));
   }
-
+  //TODO: Figure out why the sig is not working. :-(
   RSASignature sign(String message) {
     if (!canSign) {
       throw StateError;
@@ -226,7 +289,7 @@ class wagRSAEncryption implements wagEncryption {
   }
 
   bool verify(String message, RSASignature signature) {
-    if (!canSign) {
+    if (!canVerify) {
       throw StateError;
     }
 
@@ -280,12 +343,11 @@ class wagSecureRandom extends SecureRandomBase {
 }
 
 class wagKeyGen {
-  static wagDerivedKey randomDerivedKey([int bytes = 32]) {
+  static wagDerivedKey randomDerivedKey([int bytes = 16]) {
     String newpass = "";
     wagSecureRandom rand = new wagSecureRandom();
 
     newpass = wagConvert.u8L_string(rand.nextBytes(bytes));
-    print("Password: $newpass");
     return deriveKey(newpass);
   }
 

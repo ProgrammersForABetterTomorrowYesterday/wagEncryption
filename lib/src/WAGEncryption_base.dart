@@ -50,6 +50,24 @@ class wagAESEncryption implements wagEncryption {
     params = new ParametersWithIV(_kparams, iv);
   }
 
+  wagAESEncryption.deserialize(String json) {
+    Map<String, String> cereal = JSON.decode(json);
+    String key = cereal['key'];
+    String iv = cereal['iv'];
+
+    this._key = wagConvert.string_u8l(key);
+    this._kparams = new KeyParameter(_key);
+    this.iv = wagConvert.string_u8l(iv);
+    this.params = new ParametersWithIV(_kparams, iv);
+  }
+
+  String serializeKey() {
+    Map<String, String> cereal = new Map<String, String>();
+    cereal['key'] = wagConvert.u8L_string(_key);
+    cereal['iv'] = wagConvert.u8L_string(iv);
+    return JSON.encode(cereal);
+  }
+
   String encrypt(String plaintext) {
     initCipher();
     var cipher = new BlockCipher( "AES/CBC" )

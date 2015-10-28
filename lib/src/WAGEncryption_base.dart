@@ -289,7 +289,7 @@ class wagRSAEncryption implements wagEncryption {
   }
 
   bool verify(String message, RSASignature signature) {
-    if (!canSign) {
+    if (!canVerify) {
       throw StateError;
     }
 

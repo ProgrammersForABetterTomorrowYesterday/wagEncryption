@@ -49,13 +49,15 @@ class wagAESEncryption implements wagEncryption {
     }
     params = new ParametersWithIV(_kparams, iv);
   }
-
+                                    //{"key":"<Z°ÊpU®_>\u00034\u0001\u000e§","iv":"=dz\b¹$`Úôú\u0011±\u0019"}
   wagAESEncryption.deserialize(String json) {
     Map<String, String> cereal = JSON.decode(json);
-    String key = cereal['key'];
-    String iv = cereal['iv'];
+    json = json.substring(8, (json.length - 3));
+    var key = json.split('","iv":"');
+    String k = key[0];
+    String iv = key[1];
 
-    this._key = wagConvert.string_u8l(key);
+    this._key = wagConvert.string_u8l(k);
     this._kparams = new KeyParameter(_key);
     this.iv = wagConvert.string_u8l(iv);
     this.params = new ParametersWithIV(this._kparams, this.iv);

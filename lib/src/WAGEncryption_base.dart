@@ -49,7 +49,7 @@ class wagAESEncryption implements wagEncryption {
     }
     params = new ParametersWithIV(_kparams, iv);
   }
-  
+
   wagAESEncryption.deserialize(String kI) {
     var key = kI.split("|_|");
     String k = key[0];
@@ -64,7 +64,7 @@ class wagAESEncryption implements wagEncryption {
   String serializeKey() {
     String k = wagConvert.u8L_string(_key);
     String i = wagConvert.u8L_string(iv);
-    return "$k|_|$i}";
+    return "$k|_|$i";
   }
 
   String encrypt(String plaintext) {
@@ -279,12 +279,11 @@ class wagSecureRandom extends SecureRandomBase {
 }
 
 class wagKeyGen {
-  static wagDerivedKey randomDerivedKey([int bytes = 32]) {
+  static wagDerivedKey randomDerivedKey([int bytes = 16]) {
     String newpass = "";
     wagSecureRandom rand = new wagSecureRandom();
 
     newpass = wagConvert.u8L_string(rand.nextBytes(bytes));
-    print("Password: $newpass");
     return deriveKey(newpass);
   }
 

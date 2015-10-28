@@ -68,8 +68,8 @@ class wagMessageEncryption implements wagEncryption {
       var split_ct = ciphertext.split("|_|");
       String aesKey = recip_rsa.decrypt(split_ct[0]);
       String message_ct = split_ct[1];
-      wagAESEncryption received_aes = new wagAESEncryption.deserialize(aesKey);
-      String signedmessage_pt = received_aes.decrypt(message_ct);
+      rand_aes = new wagAESEncryption.deserialize(aesKey);
+      String signedmessage_pt = rand_aes.decrypt(message_ct);
       var splitmessage_pt = signedmessage_pt.split("|_|");
       String message_sig = splitmessage_pt[0];
       String message_pt = splitmessage_pt[1];

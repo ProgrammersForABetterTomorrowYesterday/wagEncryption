@@ -58,7 +58,7 @@ class wagAESEncryption implements wagEncryption {
     this._key = wagConvert.string_u8l(key);
     this._kparams = new KeyParameter(_key);
     this.iv = wagConvert.string_u8l(iv);
-    this.params = new ParametersWithIV(_kparams, iv);
+    this.params = new ParametersWithIV(this._kparams, this.iv);
   }
 
   String serializeKey() {

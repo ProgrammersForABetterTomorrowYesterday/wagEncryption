@@ -51,7 +51,6 @@ class wagAESEncryption implements wagEncryption {
   }
                                     //{"key":"<Z°ÊpU®_>\u00034\u0001\u000e§","iv":"=dz\b¹$`Úôú\u0011±\u0019"}
   wagAESEncryption.deserialize(String json) {
-    Map<String, String> cereal = JSON.decode(json);
     json = json.substring(8, (json.length - 3));
     var key = json.split('","iv":"');
     String k = key[0];

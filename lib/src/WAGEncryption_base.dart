@@ -33,13 +33,14 @@ class wagMessageEncryption implements wagEncryption {
     if(!host_rsa.canSign || !recip_rsa.canEncrypt)
       throw new UnsupportedError("Current encrypted object is unable to sign and encrypt messages.");
     if (!used) {
-      used = true;
+      //used = true;
 
       //Get host sig on pt
       RSASignature tmpsig = host_rsa.sign(plaintext);
       //Convert RSASignature to String
       Uint8List sigbytes = tmpsig.bytes;
       String sig = wagConvert.u8L_string(sigbytes);
+      RSASignature afterU8L = new RSASignature(wagConvert.string_u8l(sig));
       //Concatenate sig and pt
       StringBuffer signedbuff = new StringBuffer();
       signedbuff.writeAll([sig, plaintext], "|_|");
@@ -64,7 +65,7 @@ class wagMessageEncryption implements wagEncryption {
     if(!host_rsa.canVerify || !recip_rsa.canDecrypt)
       throw new UnsupportedError("Current encrypted object is unable to decrypt and verify messages.");
     if (!used) {
-      used = true;
+      //used = true;
       var split_ct = ciphertext.split("|_|");
       String aesKey = recip_rsa.decrypt(split_ct[0]);
       String message_ct = split_ct[1];
@@ -72,7 +73,7 @@ class wagMessageEncryption implements wagEncryption {
       String signedmessage_pt = rand_aes.decrypt(message_ct);
       var splitmessage_pt = signedmessage_pt.split("|_|");
       String message_sig = splitmessage_pt[0];
-      String message_pt = splitmessage_pt[1];
+      String message_pt = trimNulls(splitmessage_pt[1]);
       RSASignature sig = new RSASignature(wagConvert.string_u8l(message_sig));
       bool verified = host_rsa.verify(message_pt, sig);
       if (verified) {
@@ -430,4 +431,17 @@ class wagConvert {
 
     //TODO: Implement conversion between strings representing PEM files and Cipher.AsymmetricKeyPair
   }
+}
+
+String trimNulls(String bushy) {
+  String trimmed = "";
+  Uint8List bushyUnits = new Uint8List.fromList(bushy.codeUnits);
+  while (bushyUnits[0] == 0) {
+    bushyUnits = bushyUnits.sublist(1);
+  }
+  while (bushyUnits.last == 0) {
+    bushyUnits = bushyUnits.sublist(0, bushyUnits.length - 1);
+  }
+  trimmed = wagConvert.u8L_string(bushyUnits);
+  return trimmed;
 }
